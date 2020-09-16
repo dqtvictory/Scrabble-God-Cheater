@@ -1,0 +1,30 @@
+<html>
+
+<head>
+    <title>Scrabble God Mode</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abel">
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script type="text/javascript" src="https://www.brython.info/src/brython.js"></script>
+    <script type="text/javascript" src="https://www.brython.info/src/brython_stdlib.js"></script>
+</head>
+
+<body onload="brython({debug: 1, indexedDB: false})">
+    <table id="main-table">
+        <tbody id="game-board"></tbody>
+    </table>
+    <br>
+    <textarea class="input-area" id="status-text" maxlength="238" autocomplete="off"></textarea>
+    <center>
+        <br>
+        <button id="load-state">Load Board State</button> &nbsp;
+        <button id="generate-state">Generate Current State</button> &nbsp;
+        <button id="clear-board">Clear Board</button>
+    </center>
+    <br>
+    <input class="input-area" type="text" maxlength="7" id="rack-letters" placeholder="Tiles On Rack"> &nbsp;
+    <button id="generate-command">Generate Help Command</button>
+
+    <script type="text/python" src="script.py"></script>
+</body>
+
+</html>
