@@ -1,30 +1,70 @@
+
 <html>
 
-<head>
-    <title>Scrabble God Mode</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abel">
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <script type="text/javascript" src="https://www.brython.info/src/brython.js"></script>
-    <script type="text/javascript" src="https://www.brython.info/src/brython_stdlib.js"></script>
-</head>
-
-<body onload="brython({debug: 1, indexedDB: false})">
-    <table id="main-table">
-        <tbody id="game-board"></tbody>
-    </table>
-    <br>
-    <textarea class="input-area" id="status-text" maxlength="238" autocomplete="off"></textarea>
-    <center>
+    <head>
+        <title>Scrabble God Mode</title>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Abel">
+        <link rel="stylesheet" type="text/css" href="style.css">
+        <script type="text/javascript" src="https://www.brython.info/src/brython.js"></script>
+        <script type="text/javascript" src="https://www.brython.info/src/brython_stdlib.js"></script>
+    </head>
+    
+    <body onload="brython({debug: 1, indexedDB: false})">
+        <h1>The Scrabble God</h1>
+        <h3><i>A tool to make you the champion in any Scrabble game</i></h3>
+        <p>
+            This fun little project was thought at first an easy and quick one that I intended to do over a weekend. I coded out the web page below and the Python script and classes within hours on 
+            the first day using <a href="https://www.brython.info/">Brython</a>, a tool which helps to program scripts on a web page using Python, which is not normally possible without Javascript.
+            My first project using this tool was the <a href="http://trungdam.fr/path-finding/">Path Finding Algorithms Visualization</a>, and I found it super helpful for a novice JS coder like myself
+            who wants to deploy an UI quickly on the web.
+        </p>
+        <p>
+            Anyway, after a day of coding, although codes were correct, it was impossible to efficiently execute the script. There were many limitations with Brython's support for Python's standard libraries
+            and one of them was the multiprocessing module. And even though I tried to run the code on a native Python interpreter, with multiprocessing, Python was still simply too slow to iterate over hundreds
+            of thousands of possibilities for each input state. So I had to throw the whole thing away and started again from scratch.
+        </p>
+        <p>
+            At this point, I considered either C++ or C#, two of the fastest typed language out there. After some quick tests and thoughts, I decided to go for <b>C#</b>. After another day or two rewriting and
+            refactoring of what I had written previously in Python, the results were really impressive. Even without any implementation of multi-processing and multi-threading, the code executes within seconds,
+            hundreds times faster than before!
+        </p>
+        <p>
+            Then a new challenge arises. I have always planned this project to be a single package that users get when browsing this web page, which means that they wouldn't have to download any executables separately
+            in order to run the program written in C#, but the page would rather output the solution directly after computation by the program. So I made a light-weight API, also in C#, that is running silently in the
+            background of this web page, waiting for the API call. All codes are uploaded on my <a href="https://github.com/dqtvictory">Github page</a>. This API only accepts calls from this web page because they are
+            on the same machine (calls made via <i>localhost</i>) to prevent abusive calls from the Internet.
+        </p>
+        <h3>How to receive blessings from The Scrabble God?</h3>
+        <ul>
+            <li>The HTML table below represents a classic Scrabble Board with its premium squares (TW, DW, TL, DL)</li>
+            <li>Click on any square and start inputting the current state of the board that you are playing. Use the arrows on the keyboard to navigate. To delete a letter on a square, use the Delete or Backspace key</li>
+            <li>To input a blank, type the <b>?</b> key followed by a letter. You will notice that blanks don't have face value (the small number on the bottom right corner)</li>
+            <li>Type all tiles that you currently have on your rack (maximum 7 tiles). Blanks are represented by a question mark <b>?</b></li>
+            <li>Click the <b>Call The Scrabble God</b> and wait for magic</li>
+            <li>
+                After computation, the best solution is displayed in the text area. It tells you the tiles you have to play (if there are blanks, they are placed within brackets and written in lower-case), the position
+                of the first tile as a pair of number of row and column starting from the board's top-left (0, 0), the direction of tiles, and the potential score.
+            </li>
+            <li>To save the current state on the board, click <b>Generate Current State</b> and save the output text to a text file</li>
+            <li>The output text from the above point can be reloaded by being pasted to the text area and clicking <b>Load Board State</b></li>
+            <li><b>Clear Board</b> is self-explanatory</li>
+        </ul>
+        <table id="main-table">
+            <tbody id="game-board"></tbody>
+        </table>
         <br>
-        <button id="load-state">Load Board State</button> &nbsp;
-        <button id="generate-state">Generate Current State</button> &nbsp;
-        <button id="clear-board">Clear Board</button>
-    </center>
-    <br>
-    <input class="input-area" type="text" maxlength="7" id="rack-letters" placeholder="Tiles On Rack"> &nbsp;
-    <button id="generate-command">Generate Help Command</button>
-
-    <script type="text/python" src="script.py"></script>
-</body>
-
-</html>
+        <textarea class="input-area" id="status-text" maxlength="238" autocomplete="off"></textarea>
+        <center>
+            <br>
+            <button class="button" id="load-state">Load Board State</button> &nbsp;
+            <button class="button" id="generate-state">Generate Current State</button> &nbsp;
+            <button class="button" id="clear-board">Clear Board</button>
+        </center>
+        <br>
+        <input class="input-area" type="text" maxlength="7" id="rack-letters" placeholder="Tiles On Rack"> &nbsp;
+        <button class="button" id="call-god">Call The Scrabble God</button>
+    
+        <script type="text/python" src="script.py"></script>
+    </body>
+    
+    </html>

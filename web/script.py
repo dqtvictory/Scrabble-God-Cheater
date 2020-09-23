@@ -1,4 +1,4 @@
-from browser import document, html, bind, alert
+from browser import document, html, bind, alert, ajax
 
 
 SIZE = 15
@@ -254,7 +254,26 @@ def clear_board(e):
             state[(i, j)] = None
             set_square_bg_img((i, j), None)
 
-@bind(document["generate-command"], "click")
+def call_god(msg):
+    url = f"http://52.47.142.152:4000/scrabble-god-api"
+    ajax.get(url, data={"message": msg}, timeout=60, onloading=on_loading, oncomplete=on_complete, ontimeout=on_timeout)    
+
+def on_loading(e):
+    for button in document.select("button"):
+        button.disabled = True
+    print_in_textarea("Asking God for help...")
+
+def on_complete(req):
+    print_in_textarea(req.text)
+    for button in document.select("button"):
+        button.disabled = False
+
+def on_timeout():
+    print_in_textarea("Request timeout")
+    for button in document.select("button"):
+        button.disabled = False
+
+@bind(document["call-god"], "click")
 def generate_command(e):
     for pos in state:
         if state[pos]:
@@ -267,7 +286,7 @@ def generate_command(e):
         alert("Must have 7 tiles in rack since board is empty")
         return
     elif not started:
-        print_in_textarea(f"start {rack}")
+        call_god(f"start {rack}")
     else:
         command = f"help {rack} "
         for i in range(SIZE):
@@ -279,4 +298,4 @@ def generate_command(e):
                 else:
                     c = state[(i, j)]
                 command += f"{c}"
-        print_in_textarea(command)
+        call_god(command)

@@ -1,6 +1,21 @@
 <h1>Scrabble God</h1>
 Coded mainly in C#, this program searches for the best solution given a state in a game of Scrabble.
 
+<h2>Update 1:</h2>
+
+Since the first commit, I have been working part time to improve the user's experience with this project.
+
+Initially, user would have to run parallelly the web part in a browser and the executable on the same machine in order to get help from the Scrabble God, where the web page would generate a help code to be pasted manually into the executable. Now, instead of doing so, I have coded a communication between the two to help the UX sleeker by turning the compiled C# executable into a simple API running in the background waiting for the help code. This is possible thanks to C#'s `System.Net.HttpListener` class.
+
+The web part is also slightly modified to enable communication with the API. The <b>Generate Help Command</b> button is replaced with <b>Call The Scrabble God</b> which calls the API with the help message. After done thinking, the executable responds back to the caller with a help message which then is printed in the text area on the web page. Thus, users can now possess C#'s lightning computation speed on a beautifully constructed Python page, a true all-in-one experience.
+
+The web has been uploaded on my personal website at <a href="http://pro.trungdam.fr/scrabble/scrabble.html">http://pro.trungdam.fr/scrabble/scrabble.html</a>
+
+<b><i>Important notes:</i></b> `System.Net.HttpListener` is currently not functionnal with HTTPS request when listening to a non-local IP address (i.e. 127.0.0.1 or localhost). Furthermore, this class doesn't seem to work on Ubuntu listening to a non-local IP address. I haven't tried on Debian or Red Hat or any other Linux distributions. For now I can only confirm that it works fine with non-SSL requests on Windows.
+
+---------------------------------
+<h2>Update 0:</h2>
+
 This project consists of 2 parts: the web interface, and the program itself.
 
 - The <b>web</b> part, coded in simple HTML and Python using <a href="https://www.brython.info/">Brython</a>, a Python implementation for client-side web programming which executes Python code on a web browser. This part provides a graphical Scrabble board in which user can input a game state and the tiles available to play the next move. Based on the current state and tiles, the user can generate a command understood by the <b>program</b>, save the current state to a string, and load a previously saved state using this outputted string.

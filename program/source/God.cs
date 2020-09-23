@@ -69,7 +69,6 @@ namespace Scrabble
                 }
             }
             // Iterate every square on the board and attempt to place tiles
-            ulong iterCount = 0;
             if (!game.Started)
             {
                 // Special case when game not started. This reduce execution time
@@ -87,7 +86,6 @@ namespace Scrabble
                             {
                                 var permuArr = permu.ToArray();
                                 if (orderedTiles.Contains(permuArr)) continue;
-                                iterCount++;
                                 orderedTiles.Add(permuArr);
                                 var placed = steps.Zip(permuArr).ToList();
                                 var score = game.Attempt(placed, true);
@@ -126,7 +124,6 @@ namespace Scrabble
                                 {
                                     var permuArr = permu.ToArray();
                                     if (orderedTiles.Contains(permuArr)) continue;
-                                    iterCount++;
                                     orderedTiles.Add(permuArr);
                                     var placed = hSteps.Zip(permuArr).ToList();
                                     var score = game.Attempt(placed, true);
@@ -171,8 +168,6 @@ namespace Scrabble
                     }
                 }
             }
-            Console.WriteLine();
-            Console.WriteLine($"Number of iterations: {iterCount}");
             bestMove.TrimExcess();
             return (highScore, bestMove);
         }

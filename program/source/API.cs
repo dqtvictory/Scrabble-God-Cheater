@@ -1,44 +1,67 @@
 ﻿using System;
+using System.Net;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Text;
 
 namespace Scrabble
 {
-    class Program
+    class API
     {
-        static ScrabbleGod god;
-        static void Main(string[] args)
+        private static HttpListener listener;
+        private const string url = "http://localhost:4000/";
+        private static ScrabbleGod god;
+
+        static async Task HandleIncomingConnections()
         {
-            Console.WriteLine("===================================");
-            Console.WriteLine("WELCOME TO THE SCRABBLE GOD PROGRAM");
-            Console.WriteLine("===================================");
-            Console.WriteLine();
-            
-            god = new ScrabbleGod();
             while (true)
             {
-                Console.WriteLine();
-                Console.Write(">>> ");
-                var command = Console.ReadLine();
-                if (command.ToLower() == "quit")
+                // Will wait here until we hear from a connection
+                var ctx = await listener.GetContextAsync();
+
+                // Peel out the requests and response objects
+                var req = ctx.Request;
+                var resp = ctx.Response;
+
+                if (req.Url.AbsolutePath != "/scrabble-god-api")
                 {
-                    Console.WriteLine("Bye!");
-                    Console.WriteLine("Press any key to leave the Scrabble God's Kingdom...");
-                    Console.ReadKey();
-                    break;
+                    resp.Close();
+                    continue;
                 }
-                else
+
+                string respText;
+
+                // Get info about the request
+                var reqString = req.QueryString.Get("message");
+                Console.WriteLine($"New Request: {reqString}");
+                try { respText = ParseRequest(reqString); }
+                catch(FormatException ex) { respText = ex.Message; }
+                catch(Exception ex)
                 {
-                    try { ParseCommand(command); }
-                    catch (FormatException e) { Console.WriteLine(e.ToString()); }
+                    Console.WriteLine($"Error: {ex.Message}");
+                    resp.Close();
+                    continue;
                 }
+
+                // Write the response info
+                byte[] data = Encoding.UTF8.GetBytes(respText);
+                resp.ContentType = "text/utf-8";
+                resp.AppendHeader("Access-Control-Allow-Origin", "*");
+                resp.ContentEncoding = Encoding.UTF8;
+                resp.ContentLength64 = data.LongLength;
+
+                // Write out to the response stream (asynchronously), then close it
+                await resp.OutputStream.WriteAsync(data, 0, data.Length);
+                Console.WriteLine($"Responded: {respText}");
+                resp.Close();
             }
         }
 
-        static string DisplayMove(List<((int i, int j) pos, char tile)> move)
+        static string StringRepMove(List<((int i, int j) pos, char tile)> move, int score)
         {
             if (move.Count() == 1)
-                return $"placing tile {move[0].tile} on square {move[0].pos}";
+                return $"Gain {score} points by placing tile {move[0].tile} on square {move[0].pos}";
             string direction;
             var (first, second) = (move[0].pos, move[1].pos);
             if (first.i == second.i)
@@ -53,12 +76,12 @@ namespace Scrabble
                 else
                     letters += tile;
             }
-            return $"placing {direction} tiles {letters} starting on square {first}";
+            return $"Gain {score} points by placing {direction} tiles '{letters}' starting on square {first}";
         }
 
-        static void ParseCommand(string command)
+        static string ParseRequest(string req)
         {
-            var commandBreakdown = command.Split(' ');
+            var commandBreakdown = req.Split(' ');
             var first = commandBreakdown[0];
             if (first == "start" && commandBreakdown.Length == 2)
             {
@@ -73,8 +96,7 @@ namespace Scrabble
                 if (god.Game.Started)
                     god.Game.NewGame();
                 var (score, move) = god.Cheat(tiles);
-                var displayMove = DisplayMove(move);
-                Console.WriteLine($"The best move gains {score} points by {displayMove}");
+                return StringRepMove(move, score);
             }
             else if (first == "help" && commandBreakdown.Length == 3)
             {
@@ -107,17 +129,39 @@ namespace Scrabble
                 god.Game.UpdateBoard(update);
                 var (score, move) = god.Cheat(tiles);
                 if (score == 0)
-                    Console.WriteLine("No move found.");
+                    return "No move found.";
                 else
                 {
-                    var displayMove = DisplayMove(move);
-                    Console.WriteLine($"The best move gains {score} points by {displayMove}");
+                    return StringRepMove(move, score);
                 }
             }
             else
             {
                 throw new FormatException("Command not understood. Try again.");
             }
+        }
+
+        static void Main(string[] args)
+        {
+            Console.WriteLine("===================================");
+            Console.WriteLine("WELCOME TO THE SCRABBLE GOD PROGRAM");
+            Console.WriteLine("===================================");
+            Console.WriteLine();
+
+            god = new ScrabbleGod();
+
+            // Create a Http server and start listening for incoming connections
+            listener = new HttpListener();
+            listener.Prefixes.Add(url);
+            listener.Start();
+            Console.WriteLine($"Listening for connections on {url}");
+
+            // Handle requests
+            Task listenTask = HandleIncomingConnections();
+            listenTask.GetAwaiter().GetResult();
+
+            // Close the listener
+            listener.Close();
         }
     }
 }
