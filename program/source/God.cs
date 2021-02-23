@@ -1,175 +1,211 @@
-﻿using System;
+﻿using Combinatorics.Collections;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Scrabble
 {
-    class ScrabbleGod
+    public static class God
     {
-        private ScrabbleGame game = new ScrabbleGame();
-        public ScrabbleGame Game { get => game; }
-
-        private static IEnumerable<IEnumerable<T>> GetCombinations<T>(IEnumerable<T> list, int length) where T : IComparable
+        public static Move GetBestMove(Board board, string rack)
         {
-            if (length == 1) return list.Select(t => new T[] { t });
-            return GetCombinations(list, length - 1)
-                .SelectMany(t => list.Where(o => o.CompareTo(t.Last()) > 0),
-                    (t1, t2) => t1.Concat(new T[] { t2 }));
-        }
+            // First create a set of all possible combinations of tiles (if there are blanks)
+            var rackCombo = new HashSet<string>();
+            int nbBlanks = rack.Count(c => c == '?');
 
-        private static IEnumerable<IEnumerable<T>> GetPermutations<T>(IEnumerable<T> list, int length)
-        {
-            if (length == 1) return list.Select(t => new T[] { t });
-            return GetPermutations(list, length - 1)
-                .SelectMany(t => list.Where(o => !t.Contains(o)),
-                    (t1, t2) => t1.Concat(new T[] { t2 }));
-        }
-
-        public (int, List<((int, int), char)>) Cheat(char[] tiles)
-        {
-            var state = game.Board.State;
-            var squares = game.FindObligatedSquares();
-            int highScore = 0;
-            List<((int, int), char)> bestMove = new List<((int, int), char)>(7);
-
-            // List all racks of tiles available for placement (useful if there are blanks)
-            var len = tiles.Length;
-            HashSet<char[]> racks;
-            var blank = tiles.Count((char c) => c == '?');
-            Array.Sort(tiles);
-
-            if (blank == 0)
-            {
-                racks = new HashSet<char[]>(1);
-                racks.Add(tiles);
-            }
+            if (nbBlanks == 0)
+                rackCombo.Add(rack);
             else
             {
-                var letters = new char[len];
-                string abc = "abcdefghijklmnopqrstuvwxyz";
-                if (blank == 1)
+                var alpha = "abcdefghijklmnopqrstuvwxyz".ToCharArray();
+                var nonBlanks = rack.Where(c => c != '?');
+                foreach (var cb in new Combinations<char>(alpha, nbBlanks))
                 {
-                    racks = new HashSet<char[]>(26);
-                    tiles[1..].CopyTo(letters, 1);
-                    foreach (var c in abc)
+                    var combo = cb.Concat(nonBlanks);
+                    rackCombo.Add(new string(combo.ToArray()));
+                }
+            }
+            rackCombo.TrimExcess();
+
+            int lenRack = rack.Length;
+            var required = board.GetRequiredSquares();
+
+            if (required.Count == 1 && required.Single() == Board.StartPos)
+                // Special case when board is empty and searching for the game's first move
+                return FirstMove(lenRack, rackCombo);
+            else
+            {
+                // When game has already started (there are already tiles on the board)
+                // Create a transposed version of current board
+                var tBoard = new Board(board);
+                tBoard.Transpose();
+                var tRequired = new HashSet<(int row, int col)>(required.Count);
+                foreach (var (row, col) in required)
+                    tRequired.Add((col, row));
+
+                // Get best move from each rotation of the board
+                var hMove = BestMove(board, lenRack, rackCombo, required);
+                var vMove = BestMove(tBoard, lenRack, rackCombo, tRequired);
+
+                // If vertical move is better than horizontal, transpose the move back to original perspective
+                if (vMove.Score > 0 && vMove.Score > hMove.Score)
+                {
+                    var squares = new List<(int, int)>(vMove.Squares.Count);
+                    vMove.Squares.ToList().ForEach(pos => squares.Add((pos.col, pos.row)));
+                    return new Move
                     {
-                        letters[0] = c;
-                        racks.Add(letters);
-                    }
+                        Squares = squares,
+                        Tiles = vMove.Tiles,
+                        Horizontal = false,
+                        Score = vMove.Score
+                    };
                 }
                 else
-                {
-                    racks = new HashSet<char[]>(351);
-                    tiles[2..].CopyTo(letters, 2);
-                    foreach (var combi in GetCombinations(abc, 2))
-                    {
-                        combi.ToArray().CopyTo(letters, 0);
-                        racks.Add(letters);
-                    }
-                }
+                    return hMove;
             }
-            // Iterate every square on the board and attempt to place tiles
-            if (!game.Started)
+        }
+
+        static Move FirstMove(int lenRack, HashSet<string> rackCombo)
+        {
+            // Construct the start row to put letters
+            var startRow = new List<(int, int)> { Board.StartPos };
+            for (int i = 1; i < lenRack; i++)
             {
-                // Special case when game not started. This reduce execution time
-                var startRow = new (int, int)[13];
-                for (int j = 0; j < 13; j++)
-                    startRow[j] = (7, j + 1);
-                for (int numTiles = 2; numTiles <= 7; numTiles++)
+                startRow.Insert(0, (Board.StartPos.row, Board.StartPos.col - i));
+                startRow.Add((Board.StartPos.row, Board.StartPos.col + i));
+            }
+            int cIdx = Board.RackSize - 1;
+
+            Move best = new Move();
+            for (int nbTiles = 2; nbTiles <= lenRack; nbTiles++)
+                for (int i = Math.Max(0, cIdx - nbTiles + 1); i <= cIdx && i <= startRow.Count - nbTiles; i++)
                 {
-                    var orderedTiles = new HashSet<char[]>();
-                    for (int idx = 7 - numTiles; idx < 7; idx++)
-                    {
-                        var steps = startRow[idx..(idx + numTiles)];
-                        foreach (var rack in racks)
-                            foreach (var permu in GetPermutations(rack, numTiles))
+                    var squares = startRow.GetRange(i, nbTiles);
+                    var tried = new HashSet<string>();
+                    foreach (string rack in rackCombo)
+                        foreach (var combo in new Combinations<char>(rack.ToCharArray(), nbTiles))
+                            foreach (var permu in new Permutations<char>(combo))
                             {
-                                var permuArr = permu.ToArray();
-                                if (orderedTiles.Contains(permuArr)) continue;
-                                orderedTiles.Add(permuArr);
-                                var placed = steps.Zip(permuArr).ToList();
-                                var score = game.Attempt(placed, true);
-                                if (score > highScore) 
+                                var word = new string(permu.ToArray());
+                                if (Board.CheckVocab(word) && tried.Add(word))
                                 {
-                                    highScore = score;
-                                    bestMove = placed;
+                                    int score = 0, mul = 1;
+                                    for (int j = 0; j < nbTiles; j++)
+                                    {
+                                        var (tile, pos) = (permu[j], squares[j]);
+                                        var fv = Board.FaceValue(tile);
+                                        if (Board.Kind(pos) == SquareKind.DL)
+                                            fv *= 2;
+                                        else if (Board.Kind(pos) == SquareKind.TL)
+                                            fv *= 3;
+                                        else if (Board.Kind(pos) == SquareKind.DW || pos == Board.StartPos)
+                                            mul *= 2;
+                                        else if (Board.Kind(pos) == SquareKind.TW)
+                                            mul *= 3;
+                                        score += fv;
+                                        
+                                    }
+                                    score *= mul;
+                                    if (nbTiles == Board.RackSize)
+                                        score += Board.BingoBonus;
+
+                                    var move = new Move
+                                    {
+                                        Squares = squares,
+                                        Tiles = permu,
+                                        Horizontal = true,
+                                        Score = score
+                                    };
+                                    if (move.Score > best.Score)
+                                        best = move;
                                 }
                             }
-                    }
                 }
-            }
-            else
+            return best;
+        }
+
+        static Move BestMove(Board board, int lenRack, HashSet<string> rackCombo, HashSet<(int row, int col)> required)
+        {
+            // First construct a table of valid moves by position and tiles
+            var tilesToTest = rackCombo.Count == 1
+                ? new HashSet<char>(rackCombo.Single())
+                : new HashSet<char>(Board.TILES);
+
+            var valid = new Dictionary<(int, int), HashSet<char>>(required.Count);
+            foreach (var pos in required)
             {
-                // When game has already started, check every square on board
-                foreach (var pos in state.Keys)
+                valid[pos] = new HashSet<char>();
+                foreach (char tile in tilesToTest)
                 {
-                    if (state[pos] > 0) continue;
-                    (int, int) hCurrent, vCurrent;
-                    List<(int, int)> hSteps, vSteps;
-                    bool canPlaceTiles = false;
-
-                    hCurrent = pos;
-                    hSteps = new List<(int, int)>(len);
-                    for (int numTiles = 1; numTiles <= len; numTiles++)
+                    // Testing if vertical word is valid
+                    var vWord = board.OneSide(pos, 'U') + tile + board.OneSide(pos, 'D');
+                    if (Board.CheckVocab(vWord))
                     {
-                        if (hCurrent == (-1, -1)) break;
-                        hSteps.Add(hCurrent);
-                        if (squares.Contains(hCurrent))
-                            canPlaceTiles = true;
-                        if (canPlaceTiles)
-                        {
-                            var orderedTiles = new HashSet<char[]>();
-                            foreach (var rack in racks)
-                                foreach (var permu in GetPermutations(rack, numTiles))
-                                {
-                                    var permuArr = permu.ToArray();
-                                    if (orderedTiles.Contains(permuArr)) continue;
-                                    orderedTiles.Add(permuArr);
-                                    var placed = hSteps.Zip(permuArr).ToList();
-                                    var score = game.Attempt(placed, true);
-                                    if (score > highScore)
-                                    {
-                                        highScore = score;
-                                        bestMove = placed;
-                                    }
-                                }
-                        }
-                        hCurrent = game.GetNextSquare(hCurrent, true);
-                    }
-                    canPlaceTiles = false;
-
-                    vCurrent = pos;
-                    vSteps = new List<(int, int)>(len);
-                    for (int numTiles = 1; numTiles <= len; numTiles++)
-                    {
-                        if (vCurrent == (-1, -1)) break;
-                        vSteps.Add(vCurrent);
-                        if (squares.Contains(vCurrent))
-                            canPlaceTiles = true;
-                        if (canPlaceTiles)
-                        {
-                            var orderedTiles = new HashSet<char[]>();
-                            foreach (var rack in racks)
-                                foreach (var permu in GetPermutations(rack, numTiles))
-                                {
-                                    var permuArr = permu.ToArray();
-                                    if (orderedTiles.Contains(permuArr)) continue;
-                                    orderedTiles.Add(permuArr);
-                                    var placed = vSteps.Zip(permuArr).ToList();
-                                    var score = game.Attempt(placed, false);
-                                    if (score > highScore)
-                                    {
-                                        highScore = score;
-                                        bestMove = placed;
-                                    }
-                                }
-                        }
-                        vCurrent = game.GetNextSquare(vCurrent, false);
+                        valid[pos].Add(tile);
+                        valid[pos].Add(char.ToLower(tile));
                     }
                 }
             }
-            bestMove.TrimExcess();
-            return (highScore, bestMove);
+
+            Move best = new Move();
+
+            // Iterate over every required squares and attempt placing tiles horizontally
+            foreach (var pos in required)
+            {
+                var row = new List<(int row, int col)> { pos };
+                bool goL = true, goR = true;
+                int anchorIdx = 0;
+                for (int i = 0; i < lenRack - 1; i++)
+                {
+                    if (!goL && !goR)
+                        break;
+                    if (goL)
+                    {
+                        var prev = board.PrevSquare(row[0]);
+                        if (prev == (-1, -1))
+                            goL = false;
+                        else
+                        {
+                            row.Insert(0, prev);
+                            anchorIdx++;
+                        }
+                    }
+                    if (goR)
+                    {
+                        var next = board.NextSquare(row.Last());
+                        if (next == (-1, -1))
+                            goR = false;
+                        else
+                            row.Append(next);
+                    }
+                }
+                int lenRow = row.Count;
+
+                for (int nbTiles = 1; nbTiles <= lenRack; nbTiles++)
+                    for (int i = Math.Max(0, anchorIdx - nbTiles + 1); i <= anchorIdx && i <= lenRow - nbTiles; i++)
+                    {
+                        var squares = row.GetRange(i, nbTiles);
+                        var validIdx = squares.FindAll(sq => valid.ContainsKey(sq)).Select(sq => squares.IndexOf(sq));
+                        var tried = new HashSet<string>();
+                        foreach (string rack in rackCombo)
+                            foreach (var combo in new Combinations<char>(rack.ToCharArray(), nbTiles))
+                                foreach (var permu in new Permutations<char>(combo))
+                                    if (tried.Add(new string(permu.ToArray())) 
+                                        && validIdx.All(idx => valid[squares[idx]].Contains(permu[idx])))
+                                    {
+                                        var move = new Move
+                                        {
+                                            Squares = squares,
+                                            Tiles = permu,
+                                            Horizontal = true
+                                        };
+                                        move.Evaluate(board);
+                                        if (move.Score > best.Score)
+                                            best = move;
+                                    }
+                    }
+            }
+            return best;
         }
     }
 }
