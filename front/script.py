@@ -255,7 +255,7 @@ def clear_board(e):
             set_square_bg_img((i, j), None)
 
 def call_god(msg):
-    url = f"http://localhost:4000/scrabble-god-api"
+    url = f"http://localhost:4000/scrabble"
     ajax.get(url, data={"message": msg}, timeout=60, onloading=on_loading, oncomplete=on_complete, ontimeout=on_timeout)    
 
 def on_loading(e):
